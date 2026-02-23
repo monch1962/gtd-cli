@@ -25,6 +25,22 @@ func setupTestStore(t *testing.T) *Store {
 	return store
 }
 
+func TestStore_Close(t *testing.T) {
+	store := setupTestStore(t)
+
+	if err := store.Close(); err != nil {
+		t.Errorf("Close failed: %v", err)
+	}
+}
+
+func TestStore_Migrate(t *testing.T) {
+	store := setupTestStore(t)
+
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Errorf("Migrate failed: %v", err)
+	}
+}
+
 func TestStore_Health(t *testing.T) {
 	store := setupTestStore(t)
 
@@ -735,5 +751,191 @@ func TestReviewRepository_Complete(t *testing.T) {
 	}
 	if got.Note != "All done" {
 		t.Errorf("Note = %s, want All done", got.Note)
+	}
+}
+
+func TestTaskRepository_ListWithFilters(t *testing.T) {
+	store := setupTestStore(t)
+
+	ctx := context.Background()
+
+	project := &core.Project{
+		ID:        "prj_01HX0000000000000000000000",
+		Name:      "Project A",
+		Status:    core.ProjectStatusActive,
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Projects().Create(ctx, project); err != nil {
+		t.Fatalf("Create project failed: %v", err)
+	}
+
+	context_ := &core.Context{
+		ID:        "ctx_01HX0000000000000000000000",
+		Name:      "@calls",
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Contexts().Create(ctx, context_); err != nil {
+		t.Fatalf("Create context failed: %v", err)
+	}
+
+	task := &core.Task{
+		ID:         "tsk_01HX0000000000000000000000",
+		Title:      "Task with project and context",
+		Status:     core.TaskStatusNext,
+		ProjectID:  &project.ID,
+		ContextIDs: []string{context_.ID},
+		CreatedAt:  time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt:  time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Tasks().Create(ctx, task); err != nil {
+		t.Fatalf("Create task failed: %v", err)
+	}
+
+	inboxTask := &core.Task{
+		ID:        "tsk_01HX0000000000000000000001",
+		Title:     "Inbox task",
+		Status:    core.TaskStatusInbox,
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Tasks().Create(ctx, inboxTask); err != nil {
+		t.Fatalf("Create inbox task failed: %v", err)
+	}
+
+	t.Run("filter by project", func(t *testing.T) {
+		result, err := store.Tasks().List(ctx, core.TaskFilter{ProjectID: &project.ID})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(result.Items) != 1 {
+			t.Errorf("Expected 1 task, got %d", len(result.Items))
+		}
+	})
+
+	t.Run("filter by status", func(t *testing.T) {
+		status := core.TaskStatusInbox
+		result, err := store.Tasks().List(ctx, core.TaskFilter{Status: &status})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(result.Items) != 1 {
+			t.Errorf("Expected 1 inbox task, got %d", len(result.Items))
+		}
+	})
+
+	t.Run("filter by context", func(t *testing.T) {
+		result, err := store.Tasks().List(ctx, core.TaskFilter{ContextID: &context_.ID})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(result.Items) != 1 {
+			t.Errorf("Expected 1 task with context, got %d", len(result.Items))
+		}
+	})
+}
+
+func TestProjectRepository_ListWithFilter(t *testing.T) {
+	store := setupTestStore(t)
+
+	ctx := context.Background()
+
+	active := &core.Project{
+		ID:        "prj_01HX0000000000000000000000",
+		Name:      "Active Project",
+		Status:    core.ProjectStatusActive,
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Projects().Create(ctx, active); err != nil {
+		t.Fatalf("Create active project failed: %v", err)
+	}
+
+	someday := &core.Project{
+		ID:        "prj_01HX0000000000000000000001",
+		Name:      "Someday Project",
+		Status:    core.ProjectStatusSomeday,
+		CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+	}
+	if err := store.Projects().Create(ctx, someday); err != nil {
+		t.Fatalf("Create someday project failed: %v", err)
+	}
+
+	t.Run("filter by active status", func(t *testing.T) {
+		status := core.ProjectStatusActive
+		projects, err := store.Projects().List(ctx, core.ProjectFilter{Status: &status})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(projects) != 1 {
+			t.Errorf("Expected 1 active project, got %d", len(projects))
+		}
+	})
+
+	t.Run("filter by someday status", func(t *testing.T) {
+		status := core.ProjectStatusSomeday
+		projects, err := store.Projects().List(ctx, core.ProjectFilter{Status: &status})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(projects) != 1 {
+			t.Errorf("Expected 1 someday project, got %d", len(projects))
+		}
+	})
+}
+
+func TestContextRepository_List(t *testing.T) {
+	store := setupTestStore(t)
+
+	ctx := context.Background()
+
+	for i := 0; i < 3; i++ {
+		context_ := &core.Context{
+			ID:        "ctx_01HX000000000000000000000" + string(rune('0'+i)),
+			Name:      "@context" + string(rune('0'+i)),
+			CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		}
+		if err := store.Contexts().Create(ctx, context_); err != nil {
+			t.Fatalf("Create context %d failed: %v", i, err)
+		}
+	}
+
+	contexts, err := store.Contexts().List(ctx)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(contexts) != 3 {
+		t.Errorf("Expected 3 contexts, got %d", len(contexts))
+	}
+}
+
+func TestAreaRepository_List(t *testing.T) {
+	store := setupTestStore(t)
+
+	ctx := context.Background()
+
+	for i := 0; i < 2; i++ {
+		area := &core.Area{
+			ID:        "area_01HX000000000000000000000" + string(rune('0'+i)),
+			Name:      "Area " + string(rune('0'+i)),
+			CreatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC),
+		}
+		if err := store.Areas().Create(ctx, area); err != nil {
+			t.Fatalf("Create area %d failed: %v", i, err)
+		}
+	}
+
+	areas, err := store.Areas().List(ctx)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	if len(areas) != 2 {
+		t.Errorf("Expected 2 areas, got %d", len(areas))
 	}
 }
