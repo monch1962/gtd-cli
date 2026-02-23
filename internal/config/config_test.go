@@ -134,3 +134,123 @@ func TestExpandPath(t *testing.T) {
 		})
 	}
 }
+
+func TestSelectProfile(t *testing.T) {
+	content := `
+profiles:
+  default:
+    backend: sqlite
+  work:
+    backend: json
+`
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	if err := cfg.SelectProfile("work"); err != nil {
+		t.Fatalf("SelectProfile failed: %v", err)
+	}
+
+	if cfg.ActiveProfile.Backend != "json" {
+		t.Errorf("Backend = %s, want json", cfg.ActiveProfile.Backend)
+	}
+}
+
+func TestSelectProfile_NotFound(t *testing.T) {
+	cfg := Defaults()
+
+	if err := cfg.SelectProfile("nonexistent"); err == nil {
+		t.Error("SelectProfile should fail for nonexistent profile")
+	}
+}
+
+func TestValidate(t *testing.T) {
+	t.Run("valid config", func(t *testing.T) {
+		cfg := Defaults()
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("Validate() = %v, want nil", err)
+		}
+	})
+
+	t.Run("no active profile", func(t *testing.T) {
+		cfg := &Config{}
+		if err := cfg.Validate(); err == nil {
+			t.Error("Validate should fail when no active profile")
+		}
+	})
+
+	t.Run("invalid backend", func(t *testing.T) {
+		cfg := Defaults()
+		cfg.ActiveProfile.Backend = "invalid"
+		if err := cfg.Validate(); err == nil {
+			t.Error("Validate should fail for invalid backend")
+		}
+	})
+}
+
+func TestLoad_NonexistentProfile(t *testing.T) {
+	content := `
+profiles:
+  default:
+    backend: sqlite
+`
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	_, err := Load(configPath, "nonexistent")
+	if err == nil {
+		t.Error("Load should fail for nonexistent profile")
+	}
+}
+
+func TestApplyDefaults(t *testing.T) {
+	content := `
+profiles:
+  default:
+    backend: sqlite
+`
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+
+	if cfg.ActiveProfile.Output.Format != "json" {
+		t.Errorf("Default format should be json, got %s", cfg.ActiveProfile.Output.Format)
+	}
+	if cfg.ActiveProfile.Backend != "sqlite" {
+		t.Errorf("Backend should be sqlite, got %s", cfg.ActiveProfile.Backend)
+	}
+}
+
+func TestDefaults_PolicyValues(t *testing.T) {
+	cfg := Defaults()
+
+	if cfg.ActiveProfile.Policy.RequireProjectWhenLeavingInbox {
+		t.Error("Default RequireProjectWhenLeavingInbox should be false")
+	}
+	if cfg.ActiveProfile.Policy.RequireContextWhenLeavingInbox {
+		t.Error("Default RequireContextWhenLeavingInbox should be false")
+	}
+	if !cfg.ActiveProfile.Policy.AutoNextOnMoveFromInbox {
+		t.Error("Default AutoNextOnMoveFromInbox should be true")
+	}
+	if !cfg.ActiveProfile.Policy.AutoNextOnInboxProcess {
+		t.Error("Default AutoNextOnInboxProcess should be true")
+	}
+}

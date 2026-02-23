@@ -177,3 +177,206 @@ func TestPolicy_DetermineStatusAfterMove(t *testing.T) {
 		t.Errorf("DetermineStatusAfterMove(inbox, no auto) = %v, want inbox", got)
 	}
 }
+
+func TestValidateContext(t *testing.T) {
+	tests := []struct {
+		name    string
+		context *Context
+		wantErr error
+	}{
+		{
+			name:    "valid context",
+			context: &Context{Name: "@calls"},
+			wantErr: nil,
+		},
+		{
+			name:    "valid without @",
+			context: &Context{Name: "calls"},
+			wantErr: nil,
+		},
+		{
+			name:    "empty name",
+			context: &Context{Name: ""},
+			wantErr: ErrEmptyName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateContext(tt.context)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("ValidateContext() = %v, want nil", err)
+				}
+			} else {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("ValidateContext() = %v, want %v", err, tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateArea(t *testing.T) {
+	tests := []struct {
+		name    string
+		area    *Area
+		wantErr error
+	}{
+		{
+			name:    "valid area",
+			area:    &Area{Name: "Health"},
+			wantErr: nil,
+		},
+		{
+			name:    "empty name",
+			area:    &Area{Name: ""},
+			wantErr: ErrEmptyName,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateArea(tt.area)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Errorf("ValidateArea() = %v, want nil", err)
+				}
+			} else {
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("ValidateArea() = %v, want %v", err, tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
+func TestPolicy_ProcessInbox_WaitingStatus(t *testing.T) {
+	policy := DefaultPolicy()
+	projectID := "prj_123"
+	waitingFor := "John"
+
+	t.Run("waiting status with waiting_for", func(t *testing.T) {
+		params := ProcessInboxParams{
+			Task:       &Task{Status: TaskStatusInbox},
+			ToProject:  &projectID,
+			AsStatus:   TaskStatusWaiting,
+			WaitingFor: &waitingFor,
+		}
+		if err := policy.ProcessInbox(params); err != nil {
+			t.Errorf("ProcessInbox() = %v, want nil", err)
+		}
+	})
+
+	t.Run("waiting status without waiting_for", func(t *testing.T) {
+		params := ProcessInboxParams{
+			Task:      &Task{Status: TaskStatusInbox},
+			ToProject: &projectID,
+			AsStatus:  TaskStatusWaiting,
+		}
+		if err := policy.ProcessInbox(params); err == nil {
+			t.Error("ProcessInbox() expected error for waiting without waiting_for")
+		}
+	})
+}
+
+func TestPolicy_ProcessInbox_TicklerStatus(t *testing.T) {
+	policy := DefaultPolicy()
+	projectID := "prj_123"
+	tickleAt := "2024-02-01"
+
+	t.Run("tickler status with tickle_at", func(t *testing.T) {
+		params := ProcessInboxParams{
+			Task:      &Task{Status: TaskStatusInbox},
+			ToProject: &projectID,
+			AsStatus:  TaskStatusTickler,
+			TickleAt:  &tickleAt,
+		}
+		if err := policy.ProcessInbox(params); err != nil {
+			t.Errorf("ProcessInbox() = %v, want nil", err)
+		}
+	})
+
+	t.Run("tickler status without tickle_at", func(t *testing.T) {
+		params := ProcessInboxParams{
+			Task:      &Task{Status: TaskStatusInbox},
+			ToProject: &projectID,
+			AsStatus:  TaskStatusTickler,
+		}
+		if err := policy.ProcessInbox(params); err == nil {
+			t.Error("ProcessInbox() expected error for tickler without tickle_at")
+		}
+	})
+}
+
+func TestPolicy_ProcessInbox_InvalidStatus(t *testing.T) {
+	policy := DefaultPolicy()
+	projectID := "prj_123"
+
+	params := ProcessInboxParams{
+		Task:      &Task{Status: TaskStatusInbox},
+		ToProject: &projectID,
+		AsStatus:  TaskStatus("invalid"),
+	}
+	if err := policy.ProcessInbox(params); err == nil {
+		t.Error("ProcessInbox() expected error for invalid status")
+	}
+}
+
+func TestDefaultPolicy(t *testing.T) {
+	policy := DefaultPolicy()
+
+	if policy.RequireProjectWhenLeavingInbox {
+		t.Error("Default RequireProjectWhenLeavingInbox should be false")
+	}
+	if policy.RequireContextWhenLeavingInbox {
+		t.Error("Default RequireContextWhenLeavingInbox should be false")
+	}
+	if !policy.AutoNextOnMoveFromInbox {
+		t.Error("Default AutoNextOnMoveFromInbox should be true")
+	}
+	if !policy.AutoNextOnInboxProcess {
+		t.Error("Default AutoNextOnInboxProcess should be true")
+	}
+}
+
+func TestIsValidTaskStatus(t *testing.T) {
+	validStatuses := []TaskStatus{
+		TaskStatusInbox,
+		TaskStatusNext,
+		TaskStatusWaiting,
+		TaskStatusSomeday,
+		TaskStatusTickler,
+		TaskStatusReference,
+		TaskStatusDone,
+	}
+
+	for _, status := range validStatuses {
+		if !isValidTaskStatus(status) {
+			t.Errorf("isValidTaskStatus(%s) = false, want true", status)
+		}
+	}
+
+	if isValidTaskStatus(TaskStatus("invalid")) {
+		t.Error("isValidTaskStatus(invalid) = true, want false")
+	}
+}
+
+func TestIsValidProjectStatus(t *testing.T) {
+	validStatuses := []ProjectStatus{
+		ProjectStatusActive,
+		ProjectStatusSomeday,
+		ProjectStatusDone,
+		ProjectStatusArchived,
+	}
+
+	for _, status := range validStatuses {
+		if !isValidProjectStatus(status) {
+			t.Errorf("isValidProjectStatus(%s) = false, want true", status)
+		}
+	}
+
+	if isValidProjectStatus(ProjectStatus("invalid")) {
+		t.Error("isValidProjectStatus(invalid) = true, want false")
+	}
+}
