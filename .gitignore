@@ -1,0 +1,4 @@
+/gtd-cli
+*.db
+*.test
+coverage.out
