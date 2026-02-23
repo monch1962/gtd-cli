@@ -50,6 +50,11 @@ Example:
 			project.AreaID = &areaID
 		}
 
+		if err := core.ValidateProject(project); err != nil {
+			writeError(cmd, "gtd-cli project create", jsonout.ErrValidation, err.Error(), nil)
+			return
+		}
+
 		if err := app.Store.Projects().Create(context.Background(), project); err != nil {
 			writeError(cmd, "gtd-cli project create", jsonout.ErrInternal, err.Error(), nil)
 			return
@@ -153,7 +158,11 @@ Example:
 			return
 		}
 
-		project, _ := app.Store.Projects().Get(context.Background(), projectID)
+		project, err := app.Store.Projects().Get(context.Background(), projectID)
+		if err != nil {
+			writeError(cmd, "gtd-cli project archive", jsonout.ErrInternal, err.Error(), nil)
+			return
+		}
 		writeSuccess(cmd, "gtd-cli project archive", project)
 	},
 }
@@ -169,5 +178,5 @@ func init() {
 	projectCreateCmd.Flags().String("area", "", "area of focus to assign the project to")
 
 	projectListCmd.Flags().String("status", "", "filter by status (active|someday|done|archived)")
-	projectListCmd.Flags().Int("limit", 100, "maximum number of results")
+	projectListCmd.Flags().Int("limit", core.DefaultLimit, "maximum number of results")
 }

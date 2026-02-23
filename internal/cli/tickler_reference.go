@@ -40,7 +40,7 @@ Example:
 		}
 		defer app.Store.Close()
 
-		tickleAt, err := time.Parse("2006-01-02", dateStr)
+		tickleAt, err := time.Parse(core.DateFormat, dateStr)
 		if err != nil {
 			writeError(cmd, "gtd-cli tickler add", jsonout.ErrValidation, "invalid date format (use YYYY-MM-DD)", nil)
 			return
@@ -59,6 +59,11 @@ Example:
 
 		if projectID != "" {
 			task.ProjectID = &projectID
+		}
+
+		if err := core.ValidateTask(task); err != nil {
+			writeError(cmd, "gtd-cli tickler add", jsonout.ErrValidation, err.Error(), nil)
+			return
 		}
 
 		if err := app.Store.Tasks().Create(context.Background(), task); err != nil {
@@ -98,7 +103,7 @@ Examples:
 		}
 
 		if fromStr != "" {
-			_, err := time.Parse("2006-01-02", fromStr)
+			_, err := time.Parse(core.DateFormat, fromStr)
 			if err != nil {
 				writeError(cmd, "gtd-cli tickler list", jsonout.ErrValidation, "invalid from date format (use YYYY-MM-DD)", nil)
 				return
@@ -106,7 +111,7 @@ Examples:
 		}
 
 		if toStr != "" {
-			_, err := time.Parse("2006-01-02", toStr)
+			_, err := time.Parse(core.DateFormat, toStr)
 			if err != nil {
 				writeError(cmd, "gtd-cli tickler list", jsonout.ErrValidation, "invalid to date format (use YYYY-MM-DD)", nil)
 				return
@@ -122,13 +127,13 @@ Examples:
 		var items []core.Task
 		for _, t := range result.Items {
 			if fromStr != "" {
-				from, _ := time.Parse("2006-01-02", fromStr)
+				from, _ := time.Parse(core.DateFormat, fromStr)
 				if t.TickleAt != nil && t.TickleAt.Before(from) {
 					continue
 				}
 			}
 			if toStr != "" {
-				to, _ := time.Parse("2006-01-02", toStr)
+				to, _ := time.Parse(core.DateFormat, toStr)
 				if t.TickleAt != nil && t.TickleAt.After(to) {
 					continue
 				}
@@ -188,6 +193,11 @@ Example:
 			}
 		}
 
+		if err := core.ValidateTask(task); err != nil {
+			writeError(cmd, "gtd-cli reference add", jsonout.ErrValidation, err.Error(), nil)
+			return
+		}
+
 		if err := app.Store.Tasks().Create(context.Background(), task); err != nil {
 			writeError(cmd, "gtd-cli reference add", jsonout.ErrInternal, err.Error(), nil)
 			return
@@ -242,7 +252,7 @@ func init() {
 
 	ticklerListCmd.Flags().String("from", "", "filter from date (YYYY-MM-DD)")
 	ticklerListCmd.Flags().String("to", "", "filter to date (YYYY-MM-DD)")
-	ticklerListCmd.Flags().Int("limit", 100, "maximum number of results")
+	ticklerListCmd.Flags().Int("limit", core.DefaultLimit, "maximum number of results")
 
 	referenceCmd.AddCommand(referenceAddCmd)
 	referenceCmd.AddCommand(referenceListCmd)
@@ -252,5 +262,5 @@ func init() {
 	referenceAddCmd.Flags().String("note", "", "additional note")
 	referenceAddCmd.MarkFlagRequired("title")
 
-	referenceListCmd.Flags().Int("limit", 100, "maximum number of results")
+	referenceListCmd.Flags().Int("limit", core.DefaultLimit, "maximum number of results")
 }

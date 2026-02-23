@@ -44,6 +44,11 @@ Example:
 			UpdatedAt: now,
 		}
 
+		if err := core.ValidateArea(area); err != nil {
+			writeError(cmd, "gtd-cli area add", jsonout.ErrValidation, err.Error(), nil)
+			return
+		}
+
 		if err := app.Store.Areas().Create(context.Background(), area); err != nil {
 			writeError(cmd, "gtd-cli area add", jsonout.ErrInternal, err.Error(), nil)
 			return

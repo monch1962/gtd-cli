@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -184,7 +185,7 @@ func (r *taskRepo) List(ctx context.Context, filter core.TaskFilter) (*core.Task
 
 	limit := filter.Limit
 	if limit <= 0 {
-		limit = 100
+		limit = core.DefaultLimit
 	}
 	offset := filter.Offset
 	if offset < 0 {
@@ -208,31 +209,36 @@ func (r *taskRepo) List(ctx context.Context, filter core.TaskFilter) (*core.Task
 }
 
 func sortTasks(tasks []core.Task) {
-	for i := 0; i < len(tasks)-1; i++ {
-		for j := i + 1; j < len(tasks); j++ {
-			ti := tasks[i]
-			tj := tasks[j]
-
-			swap := false
-			if ti.DueAt == nil && tj.DueAt != nil {
-				swap = false
-			} else if ti.DueAt != nil && tj.DueAt == nil {
-				swap = true
-			} else if ti.DueAt != nil && tj.DueAt != nil {
-				if ti.DueAt.Before(*tj.DueAt) {
-					swap = true
-				} else if ti.DueAt.Equal(*tj.DueAt) && ti.CreatedAt.Before(tj.CreatedAt) {
-					swap = true
-				}
-			} else if ti.CreatedAt.Before(tj.CreatedAt) {
-				swap = true
-			}
-
-			if swap {
-				tasks[i], tasks[j] = tasks[j], tasks[i]
-			}
+	slices.SortFunc(tasks, func(a, b core.Task) int {
+		if a.DueAt == nil && b.DueAt != nil {
+			return 1
 		}
-	}
+		if a.DueAt != nil && b.DueAt == nil {
+			return -1
+		}
+		if a.DueAt != nil && b.DueAt != nil {
+			if a.DueAt.Before(*b.DueAt) {
+				return -1
+			}
+			if a.DueAt.After(*b.DueAt) {
+				return 1
+			}
+			if a.CreatedAt.Before(b.CreatedAt) {
+				return -1
+			}
+			if a.CreatedAt.After(b.CreatedAt) {
+				return 1
+			}
+			return 0
+		}
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.After(b.CreatedAt) {
+			return 1
+		}
+		return 0
+	})
 }
 
 func contains(slice []string, item string) bool {

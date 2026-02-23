@@ -189,7 +189,7 @@ func (r *taskRepo) List(ctx context.Context, filter core.TaskFilter) (*core.Task
 
 	limit := filter.Limit
 	if limit <= 0 {
-		limit = 100
+		limit = core.DefaultLimit
 	}
 	offset := filter.Offset
 	if offset < 0 {

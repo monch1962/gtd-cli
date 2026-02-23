@@ -93,13 +93,25 @@ func startReview(cmd *cobra.Command, reviewType core.ReviewType, command string)
 	}
 
 	inboxStatus := core.TaskStatusInbox
-	inboxResult, _ := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &inboxStatus, Limit: 50})
+	inboxResult, err := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &inboxStatus, Limit: core.DefaultReviewLimit})
+	if err != nil {
+		writeError(cmd, command, jsonout.ErrInternal, err.Error(), nil)
+		return
+	}
 
 	waitingStatus := core.TaskStatusWaiting
-	waitingResult, _ := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &waitingStatus, Limit: 50})
+	waitingResult, err := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &waitingStatus, Limit: core.DefaultReviewLimit})
+	if err != nil {
+		writeError(cmd, command, jsonout.ErrInternal, err.Error(), nil)
+		return
+	}
 
 	activeStatus := core.ProjectStatusActive
-	projects, _ := app.Store.Projects().List(context.Background(), core.ProjectFilter{Status: &activeStatus, Limit: 100})
+	projects, err := app.Store.Projects().List(context.Background(), core.ProjectFilter{Status: &activeStatus, Limit: core.DefaultLimit})
+	if err != nil {
+		writeError(cmd, command, jsonout.ErrInternal, err.Error(), nil)
+		return
+	}
 
 	var staleProjects []core.Project
 	var projectsWithoutNext []string
@@ -109,15 +121,19 @@ func startReview(cmd *cobra.Command, reviewType core.ReviewType, command string)
 			staleProjects = append(staleProjects, p)
 			projectsWithoutNext = append(projectsWithoutNext, p.ID)
 		} else {
-			twoWeeksAgo := now.Add(-14 * 24 * time.Hour)
-			if p.UpdatedAt.Before(twoWeeksAgo) {
+			staleThreshold := now.Add(-time.Duration(core.StaleProjectDays) * 24 * time.Hour)
+			if p.UpdatedAt.Before(staleThreshold) {
 				staleProjects = append(staleProjects, p)
 			}
 		}
 	}
 
 	ticklerStatus := core.TaskStatusTickler
-	ticklerResult, _ := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &ticklerStatus, Limit: 50})
+	ticklerResult, err := app.Store.Tasks().List(context.Background(), core.TaskFilter{Status: &ticklerStatus, Limit: core.DefaultReviewLimit})
+	if err != nil {
+		writeError(cmd, command, jsonout.ErrInternal, err.Error(), nil)
+		return
+	}
 	var ticklersDue []core.Task
 	for _, t := range ticklerResult.Items {
 		if t.TickleAt != nil && (t.TickleAt.Before(now) || t.TickleAt.Equal(now)) {

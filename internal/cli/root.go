@@ -8,6 +8,7 @@ import (
 
 	"github.com/anomalyco/gtd-cli/internal/config"
 	"github.com/anomalyco/gtd-cli/internal/core"
+	"github.com/anomalyco/gtd-cli/internal/jsonout"
 	"github.com/anomalyco/gtd-cli/internal/store"
 	jsonfile "github.com/anomalyco/gtd-cli/internal/store/jsonfile"
 	"github.com/anomalyco/gtd-cli/internal/store/sqlite"
@@ -41,6 +42,18 @@ func (a *App) Policy() core.Policy {
 		AutoNextOnMoveFromInbox:        a.Config.ActiveProfile.Policy.AutoNextOnMoveFromInbox,
 		AutoNextOnInboxProcess:         a.Config.ActiveProfile.Policy.AutoNextOnInboxProcess,
 	}
+}
+
+type AppFunc func(*App)
+
+func withApp(cmd *cobra.Command, command string, fn AppFunc) {
+	app, err := newApp(rootCmd.Version)
+	if err != nil {
+		writeError(cmd, command, jsonout.ErrInternal, err.Error(), nil)
+		return
+	}
+	defer app.Store.Close()
+	fn(app)
 }
 
 var rootCmd = &cobra.Command{

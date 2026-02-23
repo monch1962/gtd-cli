@@ -105,8 +105,8 @@ profiles:
 func TestDefaults(t *testing.T) {
 	cfg := Defaults()
 
-	if cfg.ActiveProfile.Backend != "sqlite" {
-		t.Errorf("Default backend = %s, want sqlite", cfg.ActiveProfile.Backend)
+	if cfg.ActiveProfile.Backend != DefaultBackend {
+		t.Errorf("Default backend = %s, want %s", cfg.ActiveProfile.Backend, DefaultBackend)
 	}
 	if cfg.ActiveProfile.Output.Format != "json" {
 		t.Errorf("Default format = %s, want json", cfg.ActiveProfile.Output.Format)

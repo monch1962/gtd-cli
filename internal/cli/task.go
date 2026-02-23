@@ -136,7 +136,11 @@ Example:
 			}
 		}
 
-		updated, _ := app.Store.Tasks().Get(context.Background(), taskID)
+		updated, err := app.Store.Tasks().Get(context.Background(), taskID)
+		if err != nil {
+			writeError(cmd, "gtd-cli task move", jsonout.ErrInternal, err.Error(), nil)
+			return
+		}
 		writeSuccess(cmd, "gtd-cli task move", updated)
 	},
 }
@@ -166,7 +170,11 @@ Example:
 			return
 		}
 
-		task, _ := app.Store.Tasks().Get(context.Background(), taskID)
+		task, err := app.Store.Tasks().Get(context.Background(), taskID)
+		if err != nil {
+			writeError(cmd, "gtd-cli task complete", jsonout.ErrInternal, err.Error(), nil)
+			return
+		}
 		writeSuccess(cmd, "gtd-cli task complete", task)
 	},
 }
@@ -194,7 +202,11 @@ Example:
 			return
 		}
 
-		task, _ := app.Store.Tasks().Get(context.Background(), taskID)
+		task, err := app.Store.Tasks().Get(context.Background(), taskID)
+		if err != nil {
+			writeError(cmd, "gtd-cli task reopen", jsonout.ErrInternal, err.Error(), nil)
+			return
+		}
 		writeSuccess(cmd, "gtd-cli task reopen", task)
 	},
 }
@@ -249,7 +261,7 @@ func init() {
 	taskListCmd.Flags().String("project", "", "filter by project ID")
 	taskListCmd.Flags().String("context", "", "filter by context ID")
 	taskListCmd.Flags().String("status", "", "filter by status (inbox|next|waiting|someday|tickler|reference|done)")
-	taskListCmd.Flags().Int("limit", 100, "maximum number of results")
+	taskListCmd.Flags().Int("limit", core.DefaultLimit, "maximum number of results")
 	taskListCmd.Flags().Int("offset", 0, "offset for pagination")
 
 	taskMoveCmd.Flags().String("to-project", "", "project to move the task to (required)")

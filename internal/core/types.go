@@ -2,6 +2,13 @@ package core
 
 import "time"
 
+const (
+	DefaultLimit       = 100
+	DefaultReviewLimit = 50
+	StaleProjectDays   = 14
+	DateFormat         = "2006-01-02"
+)
+
 type TaskStatus string
 
 const (
@@ -103,12 +110,6 @@ type ProjectFilter struct {
 	Status *ProjectStatus
 	Limit  int
 	Offset int
-}
-
-type TicklerFilter struct {
-	From  *time.Time
-	To    *time.Time
-	Limit int
 }
 
 type ReviewFilter struct {

@@ -9,6 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const DefaultBackend = "json"
+
 type Config struct {
 	Profiles      map[string]Profile `yaml:"profiles"`
 	ActiveProfile *Profile           `yaml:"-"`
@@ -46,7 +48,7 @@ type PolicyConfig struct {
 func Defaults() *Config {
 	home, _ := os.UserHomeDir()
 	defaultProfile := Profile{
-		Backend: "sqlite",
+		Backend: DefaultBackend,
 		SQLite: SQLiteConfig{
 			Path: filepath.Join(home, ".local/share/gtd-cli/gtd.sqlite"),
 		},
@@ -82,7 +84,7 @@ func (c *Config) ApplyDefaults() {
 
 	for name, p := range c.Profiles {
 		if p.Backend == "" {
-			p.Backend = "sqlite"
+			p.Backend = DefaultBackend
 		}
 		if p.SQLite.Path == "" {
 			home, _ := os.UserHomeDir()

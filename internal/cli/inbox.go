@@ -57,6 +57,11 @@ Example:
 			task.ProjectID = &projectID
 		}
 
+		if err := core.ValidateTask(task); err != nil {
+			writeError(cmd, "gtd-cli inbox add", jsonout.ErrValidation, err.Error(), nil)
+			return
+		}
+
 		if err := app.Store.Tasks().Create(context.Background(), task); err != nil {
 			writeError(cmd, "gtd-cli inbox add", jsonout.ErrInternal, err.Error(), nil)
 			return
@@ -159,7 +164,7 @@ Example:
 		}
 
 		if tickleAt != "" && as == core.TaskStatusTickler {
-			t, err := time.Parse("2006-01-02", tickleAt)
+			t, err := time.Parse(core.DateFormat, tickleAt)
 			if err != nil {
 				writeError(cmd, "gtd-cli inbox process", jsonout.ErrValidation, "invalid tickle date format (use YYYY-MM-DD)", nil)
 				return

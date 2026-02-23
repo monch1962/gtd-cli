@@ -44,6 +44,11 @@ Example:
 			UpdatedAt: now,
 		}
 
+		if err := core.ValidateContext(context_); err != nil {
+			writeError(cmd, "gtd-cli context add", jsonout.ErrValidation, err.Error(), nil)
+			return
+		}
+
 		if err := app.Store.Contexts().Create(context.Background(), context_); err != nil {
 			writeError(cmd, "gtd-cli context add", jsonout.ErrInternal, err.Error(), nil)
 			return
