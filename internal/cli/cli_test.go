@@ -331,7 +331,7 @@ func TestEnvelopeOutput(t *testing.T) {
 		t.Fatalf("WriteSuccess failed: %v", err)
 	}
 
-	var env Envelope
+	var env cliTestEnvelope
 	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestEnvelopeOutput(t *testing.T) {
 	}
 }
 
-type Envelope struct {
+type cliTestEnvelope struct {
 	OK      bool   `json:"ok"`
 	Command string `json:"command"`
 	Data    any    `json:"data"`

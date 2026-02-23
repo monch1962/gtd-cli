@@ -3,6 +3,7 @@ package jsonout
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -153,5 +154,143 @@ func TestResponseWriter_Pretty(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "\n  ") {
 		t.Errorf("Pretty output should contain indentation, got: %s", output)
+	}
+}
+
+func TestSuccess(t *testing.T) {
+	env := Success("gtd-cli task list", map[string]any{"count": 0}, "sqlite", "default", "1.0.0")
+
+	if !env.OK {
+		t.Error("Success should return OK=true")
+	}
+	if env.Command != "gtd-cli task list" {
+		t.Errorf("Command = %s, want gtd-cli task list", env.Command)
+	}
+	if env.Error != nil {
+		t.Error("Error should be nil")
+	}
+	if env.Meta.Backend != "sqlite" {
+		t.Errorf("Backend = %s, want sqlite", env.Meta.Backend)
+	}
+	if env.Meta.Profile != "default" {
+		t.Errorf("Profile = %s, want default", env.Meta.Profile)
+	}
+	if env.Meta.Version != "1.0.0" {
+		t.Errorf("Version = %s, want 1.0.0", env.Meta.Version)
+	}
+	if env.Meta.Timestamp == "" {
+		t.Error("Timestamp should not be empty")
+	}
+}
+
+func TestFailure(t *testing.T) {
+	env := Failure("gtd-cli task show", ErrNotFound, "task not found", map[string]any{"id": "tsk_123"}, "sqlite", "default", "1.0.0")
+
+	if env.OK {
+		t.Error("Failure should return OK=false")
+	}
+	if env.Command != "gtd-cli task show" {
+		t.Errorf("Command = %s, want gtd-cli task show", env.Command)
+	}
+	if env.Data != nil {
+		t.Error("Data should be nil")
+	}
+	if env.Error == nil {
+		t.Fatal("Error should not be nil")
+	}
+	if env.Error.Code != ErrNotFound {
+		t.Errorf("Error.Code = %s, want NOT_FOUND", env.Error.Code)
+	}
+	if env.Error.Message != "task not found" {
+		t.Errorf("Error.Message = %s, want 'task not found'", env.Error.Message)
+	}
+	if env.Error.Details == nil {
+		t.Error("Error.Details should not be nil")
+	}
+}
+
+func TestFailure_NilDetails(t *testing.T) {
+	env := Failure("gtd-cli task show", ErrInternal, "internal error", nil, "json", "work", "2.0.0")
+
+	if env.OK {
+		t.Error("Failure should return OK=false")
+	}
+	if env.Error == nil {
+		t.Fatal("Error should not be nil")
+	}
+	if env.Error.Details != nil {
+		t.Errorf("Error.Details should be nil, got %v", env.Error.Details)
+	}
+	if env.Meta.Backend != "json" {
+		t.Errorf("Backend = %s, want json", env.Meta.Backend)
+	}
+}
+
+func TestResponseWriter_NilClock(t *testing.T) {
+	var buf bytes.Buffer
+	rw := NewResponseWriter(&buf, nil, "sqlite", "default", "1.0.0", false)
+
+	err := rw.WriteSuccess("test", nil)
+	if err != nil {
+		t.Fatalf("WriteSuccess failed: %v", err)
+	}
+
+	var env Envelope
+	if err := json.Unmarshal(buf.Bytes(), &env); err != nil {
+		t.Fatalf("Failed to unmarshal output: %v", err)
+	}
+
+	if !env.OK {
+		t.Error("OK should be true")
+	}
+	if env.Meta.Timestamp == "" {
+		t.Error("Timestamp should not be empty when clock is nil")
+	}
+}
+
+func TestResponseWriter_WriteJSONError(t *testing.T) {
+	rw := NewResponseWriter(&errorWriter{}, nil, "sqlite", "default", "1.0.0", false)
+
+	err := rw.WriteSuccess("test", map[string]any{"key": "value"})
+	if err == nil {
+		t.Error("WriteSuccess should fail with error writer")
+	}
+}
+
+type errorWriter struct{}
+
+func (e *errorWriter) Write(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("write error")
+}
+
+func TestEnvelope_MarshalJSON_AllErrorCodes(t *testing.T) {
+	codes := []ErrorCode{ErrValidation, ErrNotFound, ErrConflict, ErrIO, ErrInternal}
+
+	for _, code := range codes {
+		t.Run(string(code), func(t *testing.T) {
+			env := Envelope{
+				OK:      false,
+				Command: "test",
+				Error: &ErrorBody{
+					Code:    code,
+					Message: "error message",
+				},
+				Meta: Meta{
+					Timestamp: "2024-01-15T10:30:00Z",
+					Backend:   "sqlite",
+					Profile:   "default",
+					Version:   "1.0.0",
+				},
+			}
+
+			data, err := json.Marshal(env)
+			if err != nil {
+				t.Fatalf("Marshal failed: %v", err)
+			}
+
+			if !bytes.Contains(data, []byte(code)) {
+				t.Errorf("Marshal should contain error code %s", code)
+			}
+		})
 	}
 }
